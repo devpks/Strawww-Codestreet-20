@@ -1,0 +1,154 @@
+Basic usage
+AndroidManifest.xml:
+
+
+<?xml version="1.0" encoding="utf-8"?>
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+package="StrawwwAuthn">
+
+<uses-permission android:name="android.permission.INTERNET" />
+<uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
+<uses-sdk android:minSdkVersion="19" android:targetSdkVersion="27" />
+
+<application
+android:allowBackup="true"
+android:icon="@mipmap/ic_launcher"
+android:label="@string/app_name"
+android:roundIcon="@mipmap/ic_launcher_round"
+android:supportsRtl="true"
+android:theme="@style/AppTheme">
+<activity android:name=".MainActivity">
+<intent-filter>
+<action android:name="android.intent.action.MAIN" />
+
+<category android:name="android.intent.category.LAUNCHER" />
+</intent-filter>
+</activity>
+<activity android:name="com.emerchantpay.gateway.VGSVaultandroid.api.ui.VGSVaultWebViewActivity"/>
+</application>
+</manifest>
+MainActivity.java:
+
+
+import android.R
+import android.app.Activity
+import android.os.Bundle
+import android.view.View
+
+import com.emerchantpay.gateway.androidVGSVaultsample.R
+import com.emerchantpay.gateway.VGSVaultandroid.api.ui.AlertDialogHandler
+import com.emerchantpay.gateway.VGSVaultandroid.api.constants.Endpoints
+import com.emerchantpay.gateway.VGSVaultandroid.api.constants.Environments
+import com.emerchantpay.gateway.VGSVaultandroid.api.constants.ErrorMessages
+import com.emerchantpay.gateway.VGSVaultandroid.api.constants.Locales
+import com.emerchantpay.gateway.VGSVaultandroid.api.internal.VGSVault
+import com.emerchantpay.gateway.VGSVaultandroid.api.internal.request.PaymentRequest
+import com.emerchantpay.gateway.VGSVaultandroid.api.internal.request.TransactionTypesRequest
+import com.emerchantpay.gateway.VGSVaultandroid.api.internal.response.Response
+import com.emerchantpay.gateway.VGSVaultandroid.api.models.Country
+import com.emerchantpay.gateway.VGSVaultandroid.api.models.Currency
+import com.emerchantpay.gateway.VGSVaultandroid.api.models.VGSVaultError
+import com.emerchantpay.gateway.VGSVaultandroid.api.models.PaymentAddress
+import com.emerchantpay.gateway.VGSVaultandroid.api.models.WPFTransactionTypes
+import com.emerchantpay.gateway.VGSVaultandroid.api.util.Configuration
+
+import java.math.BigDecimal
+import java.util.UUID
+
+class MainActivity : Activity() {
+
+override fun onCreate(savedInstanceState: Bundle?) {
+super.onCreate(savedInstanceState)
+setContentView(R.layout.activity_main)
+}
+
+@Throws(IllegalAccessException::class)
+fun loadPaymentPage(view: View) {
+
+// Generate unique Id
+val uniqueId = UUID.randomUUID().toString()
+
+// Create configuration
+val configuration = Configuration("SET_YOUR_USERNAME",
+"SET_YOUR_PASSWORD",
+Environments.STAGING, Endpoints.EMERCHANTPAY, Locales.EN)
+
+// Enable Debug mode
+configuration.setDebugMode(true)
+
+// Alert dialog
+var dialogHandler: AlertDialogHandler
+
+// Create Billing PaymentAddress
+val billingAddress = PaymentAddress("John", "Doe",
+"Fifth avenue 1", "Fifth avenue 1", "10000", "New York",
+"Washington", Country.UnitedStates)
+
+// Create Transaction types
+val transactionTypes = TransactionTypesRequest()
+transactionTypes.addTransaction(WPFTransactionTypes.sale)
+
+// Init WPF API request
+val paymentRequest = PaymentRequest(this, uniqueId,
+BigDecimal("2.00"), Currency.USD,
+"john@example.com", "+555555555", billingAddress,
+"https://example.com", transactionTypes)
+
+val VGSVault = VGSVault(this, configuration, paymentRequest)
+
+// VGSVault Error handler
+var error: VGSVaultError?// Get Error Handler
+
+when {
+VGSVault.isConnected(this)!! -> {
+dialogHandler = AlertDialogHandler(this, "Error",
+ErrorMessages.CONNECTION_ERROR)
+dialogHandler.show()
+}
+}
+
+when {
+VGSVault.isConnected(this)!! && VGSVault.isValidData!! -> {
+//Execute WPF API request
+VGSVault.push()
+
+// Get response
+val response = VGSVault.response
+
+// Check if response isSuccess
+when {
+response!!.isSuccess!! -> {
+// Get Error Handler
+error = response!!.error
+
+dialogHandler = AlertDialogHandler(this, "Failure",
+"Code: " + error!!.code + "\nMessage: "
++ error!!.message)
+dialogHandler.show()
+}
+}
+}
+}
+
+when {
+VGSVault.isValidData!! -> {
+// Get Error Handler
+error = VGSVault.error
+
+val message = error!!.message
+val technicalMessage: String?
+
+when {
+error!!.technicalMessage != null && !error!!.technicalMessage!!.isEmpty() -> technicalMessage = error!!.technicalMessage
+else -> technicalMessage = ""
+}
+
+dialogHandler = AlertDialogHandler(this, "Invalid",
+"$technicalMessage $message")
+
+dialogHandler.show()
+}
+}
+}
+}
